@@ -33,14 +33,16 @@ skripsi-anime-rag/
 ├── src/
 │   ├── preprocess.py           # Minggu 1 -- DONE (script, CPU, tidak butuh GPU)
 │   ├── build_index.py          # Minggu 2 -- DONE (modul portable CPU/GPU)
-│   ├── rag_pipeline.py         # Minggu 3-4 -- TODO
+│   ├── rag_pipeline.py         # Minggu 3-4 -- DONE (modul, mendukung Kondisi A/B/C)
 │   ├── enrichment.py           # Minggu 5 -- TODO
 │   └── guardrails.py           # Minggu 5 -- TODO
 ├── notebooks/
-│   └── 02_build_index_kaggle.ipynb   # runner tipis untuk Kaggle GPU, import dari src/build_index.py
+│   ├── 02_build_index_kaggle.ipynb   # runner Kaggle GPU untuk build_index.py
+│   └── 03_rag_pipeline_kaggle.ipynb  # runner Kaggle GPU untuk rag_pipeline.py
 ├── tests/                      # 100 query test set + ground truth (Minggu 4)
 └── docs/
-    └── Dokumen_Rincian_Project_Skripsi.docx
+    ├── Dokumen_Rincian_Project_Skripsi.docx
+    └── TROUBLESHOOTING_KAGGLE.md   # gated model, git clone, GPU quota, dsb.
 ```
 
 ## Alur Kerja: Script vs Notebook
@@ -78,7 +80,7 @@ Unduh `anime_dataset.csv` dari Kaggle (link di atas) dan letakkan di `data/raw/a
 
 - [x] **Minggu 1** — Preprocessing data: verifikasi `mal_id`, filtering rating Rx/Hentai, data hygiene (duplikat, status belum tayang + info minim), desain template chunking
 - [x] **Minggu 2** — Modul embedding + FAISS indexing (`build_index.py`) siap, portable CPU/GPU; notebook runner Kaggle tersedia
-- [ ] **Minggu 3** — Implementasi pipeline RAG dasar (Kondisi B), integrasi LangChain
+- [x] **Minggu 3** — Modul `rag_pipeline.py` siap: retrieval top-k, prompt template (LangChain), guardrail dasar di system prompt, mendukung Kondisi A/B/C langsung lewat satu fungsi `generate()`
 - [ ] **Minggu 4** — Uji top-k (3/5/10), penetapan k final, penyusunan 100 query test set + ground truth
 - [ ] **Minggu 5** — Enrichment via Jikan API (Kondisi C), guardrail konten, system prompt out-of-scope handling
 - [ ] **Minggu 6** — Implementasi Kondisi A (baseline SLM murni)
