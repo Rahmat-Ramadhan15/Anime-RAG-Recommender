@@ -1,0 +1,53 @@
+# Konfigurasi terpusat -- Dokumen Rincian Project Skripsi
+# Ubah nilai di sini, jangan hardcode di dalam script.
+
+data:
+  raw_path: "data/raw/anime_dataset.csv"
+  filtered_path: "data/processed/anime_filtered.csv"
+  documents_path: "data/processed/anime_documents.jsonl"
+  filtering_report_path: "data/processed/filtering_report.json"
+
+content_policy:
+  # Bagian 3.1 dokumen rincian project
+  block_rating_contains: ["rx"]        # match case-insensitive pada kolom rating
+  block_tag: ["hentai"]                 # dicek di kolom genres & themes
+  allow_tag: ["ecchi"]                  # eksplisit TIDAK difilter (dokumentasi kebijakan)
+
+data_hygiene:
+  # Bukan filter kualitas/skor -- lihat analisis strategi dataset
+  drop_duplicate_mal_id: true
+  drop_unaired_with_empty_synopsis: true
+  drop_all_core_fields_empty: true
+  # Skor & popularitas SENGAJA tidak dijadikan kriteria drop
+  filter_by_score: false
+  filter_by_popularity: false
+
+embedding:
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  synopsis_max_chars: 1000
+
+retrieval:
+  top_k_candidates: [3, 5, 10]   # diuji Minggu 4, nilai final diisi setelah eksperimen
+  top_k_final: null
+
+llm:
+  model_name: "meta-llama/Llama-3.2-3B-Instruct"
+  quantization: "gguf-q4"
+  language: "id"
+
+enrichment:
+  jikan_base_url: "https://api.jikan.moe/v4"
+  rate_limit_per_second: 3
+  rate_limit_per_minute: 60
+  cache_dir: "data/api_cache"
+
+evaluation:
+  test_set_size: 100
+  categories:
+    similaritas_rekomendasi: "30-40%"
+    filter_atribut: "20-30%"
+    faktual_enrichment: "15-20%"
+    multi_turn_refinement: "10-15%"
+    out_of_scope: "~10%"
+  llm_judge_model: "gemini-flash"   # ganti sesuai model judge yang dipakai
+  human_eval_sample_size: 15

@@ -1,0 +1,27 @@
+# --- Minggu 1: Preprocessing data ---
+pandas>=2.0
+
+# --- Minggu 2: Embedding & FAISS indexing ---
+sentence-transformers>=2.2
+faiss-cpu>=1.7          # laptop tanpa GPU
+# Catatan: di Kaggle Notebook, ganti ke `faiss-gpu` (lihat notebooks/02_build_index_kaggle.ipynb)
+pyyaml>=6.0
+
+# --- Minggu 3-4: RAG pipeline & LangChain ---
+langchain>=0.2
+langchain-community>=0.2
+transformers>=4.40
+torch>=2.2
+accelerate>=0.30
+
+# --- Minggu 5: Enrichment via Jikan API ---
+requests>=2.31
+
+# --- Deployment (kuantisasi GGUF-4 bit) ---
+llama-cpp-python>=0.2
+
+# --- UI ---
+gradio>=4.30
+
+# --- Evaluasi ---
+scipy>=1.11          # Wilcoxon signed-rank test

@@ -1,0 +1,36 @@
+# Data mentah & hasil proses (jangan di-commit -- besar & bisa direproduksi dari script)
+data/raw/*.csv
+data/processed/*.csv
+data/processed/*.jsonl
+data/processed/*.json
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Index FAISS & cache model (dibangun ulang via script, jangan di-commit)
+data/index/
+*.faiss
+*.pkl
+
+# Cache Jikan API (snapshot untuk reproducibility -- simpan terpisah, lihat README)
+data/api_cache/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment / secrets
+.env
+*.env.local
+
+# OS
+.DS_Store
+
+# Output eksperimen / model checkpoint besar
+*.gguf
+models/
