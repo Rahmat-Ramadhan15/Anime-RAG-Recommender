@@ -43,14 +43,10 @@ Batasan wajib:
 """
 
 PROMPT_TEMPLATE = PromptTemplate.from_template(
-    """{system_prompt}
-
-Konteks anime yang relevan:
+    """Konteks anime yang relevan:
 {context}
 
-Pertanyaan pengguna: {query}
-
-Jawaban:"""
+Pertanyaan pengguna: {query}"""
 )
 
 
@@ -76,6 +72,8 @@ class RagPipeline:
         self.mal_ids = []
         self.doc_lookup = {}
         self.llm = None  # diisi oleh load_llm()
+        self.tokenizer = None
+        self.terminators = None
 
     def load_index(self, index_dir: str = "data/index"):
         index_dir = Path(index_dir)
@@ -105,7 +103,6 @@ class RagPipeline:
                 bnb_4bit_compute_dtype=torch.float16,
                 bnb_4bit_quant_type="nf4",
             )
-            # dtype tidak dipakai bersamaan dengan quantization_config
             model_kwargs.pop("dtype", None)
 
         model = AutoModelForCausalLM.from_pretrained(
@@ -113,12 +110,24 @@ class RagPipeline:
             device_map="auto" if self.device == "cuda" else None,
             **model_kwargs,
         )
+        self.tokenizer = tokenizer
         self.llm = pipeline(
             "text-generation",
             model=model,
             tokenizer=tokenizer,
             max_new_tokens=400,
+            return_full_text=False,  # hanya kembalikan teks hasil generate, bukan prompt+jawaban
         )
+
+        # Token terminator eksplisit -- WAJIB untuk model instruction-tuned seperti Llama-3.x,
+        # kalau tidak diset, model bisa melanjutkan generate dengan giliran percakapan palsu
+        # (mengarang pertanyaan+jawaban lanjutan sendiri).
+        terminators = [tokenizer.eos_token_id]
+        eot_id = tokenizer.convert_tokens_to_ids("<|eot_id|>")
+        if eot_id is not None and eot_id != tokenizer.unk_token_id:
+            terminators.append(eot_id)
+        self.terminators = terminators
+
         print(f"[OK] LLM dimuat: {model_name} (quantize={quantize})")
 
     def retrieve(self, query: str, k: int = 5):
@@ -172,15 +181,24 @@ class RagPipeline:
         retrieved = self.retrieve(query, k=k) if use_retrieval else []
         context = self.build_context(retrieved, enrichment_data if use_enrichment else None)
 
-        prompt = PROMPT_TEMPLATE.format(
-            system_prompt=SYSTEM_PROMPT, context=context, query=query
-        )
+        user_content = PROMPT_TEMPLATE.format(context=context, query=query)
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ]
 
         if self.llm is None:
             raise RuntimeError("Panggil load_llm() dulu sebelum generate().")
 
-        output = self.llm(prompt)[0]["generated_text"]
-        answer = output[len(prompt):].strip()
+        prompt = self.tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+        output = self.llm(
+            prompt,
+            eos_token_id=self.terminators,
+            pad_token_id=self.tokenizer.eos_token_id,
+        )[0]["generated_text"]
+        answer = output.strip()  # return_full_text=False -> ini murni jawaban, bukan prompt+jawaban
 
         return {
             "query": query,
