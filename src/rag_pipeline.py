@@ -89,25 +89,34 @@ class RagPipeline:
 
     def load_llm(self, model_name: str | None = None, quantize: bool = False):
         """
-        Load model generator. `quantize=True` -> load 4-bit (butuh bitsandbytes),
-        berguna untuk Kaggle GPU dengan VRAM terbatas.
+        Load model generator. `quantize=True` -> load 4-bit via BitsAndBytesConfig
+        (butuh package bitsandbytes), berguna untuk Kaggle GPU dengan VRAM terbatas.
         """
-        from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, pipeline
         import torch
 
         model_name = model_name or self.cfg["llm"]["model_name"]
         tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-        model_kwargs = {"torch_dtype": torch.float16 if self.device == "cuda" else torch.float32}
+        model_kwargs = {"dtype": torch.float16 if self.device == "cuda" else torch.float32}
         if quantize:
-            model_kwargs["load_in_4bit"] = True
+            model_kwargs["quantization_config"] = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_quant_type="nf4",
+            )
+            # dtype tidak dipakai bersamaan dengan quantization_config
+            model_kwargs.pop("dtype", None)
 
-        model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            device_map="auto" if self.device == "cuda" else None,
+            **model_kwargs,
+        )
         self.llm = pipeline(
             "text-generation",
             model=model,
             tokenizer=tokenizer,
-            device=0 if self.device == "cuda" else -1,
             max_new_tokens=400,
         )
         print(f"[OK] LLM dimuat: {model_name} (quantize={quantize})")
