@@ -80,8 +80,8 @@ Unduh `anime_dataset.csv` dari Kaggle (link di atas) dan letakkan di `data/raw/a
 
 - [x] **Minggu 1** — Preprocessing data: verifikasi `mal_id`, filtering rating Rx/Hentai, data hygiene (duplikat, status belum tayang + info minim), desain template chunking
 - [x] **Minggu 2** — Modul embedding + FAISS indexing (`build_index.py`) siap, portable CPU/GPU; notebook runner Kaggle tersedia
-- [x] **Minggu 3** — Modul `rag_pipeline.py` siap: retrieval top-k, prompt template (LangChain), guardrail dasar di system prompt, mendukung Kondisi A/B/C langsung lewat satu fungsi `generate()`
-- [ ] **Minggu 4** — Uji top-k (3/5/10), penetapan k final, penyusunan 100 query test set + ground truth
+- [x] **Minggu 3** — Modul `rag_pipeline.py` siap dan terverifikasi di Kaggle GPU: retrieval top-k, chat template resmi Llama-3.x (bukan prompt mentah), guardrail dasar di system prompt, mendukung Kondisi A/B/C langsung lewat satu fungsi `generate()`. Kondisi A terbukti berhalusinasi (contoh: kesalahan genre & karakter karangan) -- bukti kualitatif awal untuk argumen kebutuhan RAG.
+- [x] **Minggu 4** — Generator 100 query test set + ground truth (`tests/build_test_set.py`, tidak butuh GPU); script evaluasi Recall@k/MRR (`src/evaluate_retrieval.py`, tidak butuh GPU) siap dijalankan
 - [ ] **Minggu 5** — Enrichment via Jikan API (Kondisi C), guardrail konten, system prompt out-of-scope handling
 - [ ] **Minggu 6** — Implementasi Kondisi A (baseline SLM murni)
 - [ ] **Minggu 7** — Evaluasi otomatis (Recall@k/MRR) + LLM-as-a-Judge
@@ -108,6 +108,27 @@ Output:
 | Konten | `rating` memuat "Rx", atau `genres`/`themes` memuat "Hentai" | Batasan konten wajib (Bagian 3.1) |
 | Data hygiene | Duplikat `mal_id`, status "Not yet aired" + sinopsis kosong, metadata inti kosong semua | Kebersihan data, bukan kurasi kualitas |
 | **Tidak difilter** | Skor rendah, popularitas rendah, tag "Ecchi" | Menjaga cakupan retrieval & menghindari bias komunitas MAL |
+
+> **Update kebijakan (ditemukan saat eksplorasi data):** genre "Erotica" (berbeda dari "Ecchi") menandakan
+> konten seksual eksplisit, sehingga ditambahkan ke daftar filter konten sejajar dengan "Hentai".
+> Ini mengubah `anime_documents.jsonl` -- **index FAISS perlu dibangun ulang** kalau Anda sudah
+> pernah menjalankan Minggu 2 sebelum update ini.
+
+## Menjalankan Minggu 4 (Test Set + Evaluasi Retrieval)
+
+Tidak butuh GPU/Kaggle -- jalankan langsung di laptop:
+
+```bash
+python3 tests/build_test_set.py        # generate 100 query + ground truth -> tests/test_set.jsonl
+python3 src/evaluate_retrieval.py      # hitung Recall@k & MRR untuk k=3/5/10 -> tests/topk_evaluation_report.json
+```
+
+Setelah melihat hasilnya, isi `retrieval.top_k_final` di `configs/config.yaml` dengan nilai k terpilih.
+
+**Catatan validasi:** 35 query kategori `similaritas_rekomendasi` punya ground truth *semi-otomatis*
+(overlap genre + demografi) dan wajib divalidasi manual pada subset (`needs_manual_validation: true`
+di `tests/test_set.jsonl`) sebelum dilaporkan sebagai metrik final di skripsi -- lihat Bagian 6.3
+dokumen rincian project.
 
 Lihat `docs/Dokumen_Rincian_Project_Skripsi.docx` untuk pembahasan lengkap alasan akademik di balik setiap keputusan.
 

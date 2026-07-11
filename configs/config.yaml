@@ -8,9 +8,9 @@ data:
   filtering_report_path: "data/processed/filtering_report.json"
 
 content_policy:
-  # Bagian 3.1 dokumen rincian project
+  # Bagian 3.1 dokumen rincian project (diperluas: Erotica ditambahkan setelah ditemukan di data)
   block_rating_contains: ["rx"]        # match case-insensitive pada kolom rating
-  block_tag: ["hentai"]                 # dicek di kolom genres & themes
+  block_tag: ["hentai", "erotica"]      # dicek di kolom genres & themes
   allow_tag: ["ecchi"]                  # eksplisit TIDAK difilter (dokumentasi kebijakan)
 
 data_hygiene:

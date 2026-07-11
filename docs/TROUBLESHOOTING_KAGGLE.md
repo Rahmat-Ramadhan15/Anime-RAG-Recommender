@@ -38,3 +38,38 @@ dengan nama dataset Anda sendiri (bisa dilihat di panel "Input" sebelah kanan no
 Kalau muncul CUDA OOM meski sudah pakai GPU:
 - Tambahkan `torch_dtype=torch.float16` atau `load_in_4bit=True` (butuh `bitsandbytes`) saat load model
 - Turunkan `batch_size` pada tahap embedding (Minggu 2) kalau OOM terjadi di situ, bukan saat LLM
+
+## 7. Kondisi A (atau kondisi lain) menghasilkan jawaban yang "melanjutkan sendiri" percakapan palsu
+Contoh gejala: model menjawab pertanyaan Anda, lalu mengarang pertanyaan susulan dan
+menjawabnya sendiri, diakhiri teks aneh seperti "Konteks selesai."
+
+Penyebab: model instruction-tuned (Llama-3.x) punya format chat khusus dengan token
+`<|start_header_id|>`, `<|eot_id|>`, dsb. Kalau prompt dikirim sebagai teks mentah
+(tanpa `tokenizer.apply_chat_template()`) dan tanpa terminator token yang benar,
+model tidak tahu kapan harus berhenti -- ia melanjutkan generate hingga `max_new_tokens`
+habis, termasuk mengarang giliran percakapan baru.
+
+Ini sudah diperbaiki di `src/rag_pipeline.py`: `load_llm()` sekarang menyimpan
+`self.tokenizer` dan `self.terminators` (termasuk `<|eot_id|>`), dan `generate()`
+memakai `tokenizer.apply_chat_template(messages, add_generation_prompt=True)` alih-alih
+menyusun prompt sebagai string biasa. Kalau Anda menulis pemanggilan LLM sendiri di
+tempat lain (mis. notebook eksperimen), pastikan selalu memakai pola yang sama:
+```python
+messages = [{"role": "system", "content": ...}, {"role": "user", "content": ...}]
+prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+output = pipe(prompt, eos_token_id=terminators, pad_token_id=tokenizer.eos_token_id)
+```
+
+## 8. `TypeError: ...__init__() got an unexpected keyword argument 'load_in_4bit'`
+Versi `transformers` yang lebih baru (di Kaggle biasanya auto-update ke versi terbaru)
+sudah tidak menerima `load_in_4bit=True` langsung di `from_pretrained()`. Ini sudah
+diperbaiki di `src/rag_pipeline.py` dengan `BitsAndBytesConfig(load_in_4bit=True, ...)`.
+Kalau Anda menulis kode load model sendiri di tempat lain, pola yang benar:
+```python
+from transformers import BitsAndBytesConfig
+quant_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.float16)
+model = AutoModelForCausalLM.from_pretrained(model_name, quantization_config=quant_config, device_map="auto")
+```
+Juga: `torch_dtype=` sudah deprecated, ganti jadi `dtype=` (masih berfungsi tapi memunculkan warning).
+Kalau error serupa muncul lagi untuk parameter lain, cek changelog `transformers` versi yang terpasang
+(`pip show transformers`) -- API loading model di library ini cukup sering berubah antar rilis.

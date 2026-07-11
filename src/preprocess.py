@@ -67,9 +67,11 @@ def filter_content(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     """
     Filtering dua kategori (sesuai kesepakatan konsultasi):
 
-    A. Batasan konten (Bagian 3.1):
+    A. Batasan konten (Bagian 3.1, diperluas):
        - rating memuat 'Rx' (format aktual di data: 'Rx - Hentai') -> DROP (hard filter)
        - genres/themes memuat 'Hentai'                             -> DROP (pengecekan redundan)
+       - genres/themes memuat 'Erotica'                            -> DROP (konten seksual eksplisit,
+         berbeda dari Ecchi yang sekadar fanservice ringan -- kebijakan konservatif)
        - genres/themes memuat 'Ecchi'                              -> TIDAK di-drop
 
     B. Data hygiene (bukan filter kualitas/skor -- lihat pembahasan strategi dataset):
@@ -86,7 +88,9 @@ def filter_content(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     mask_rx = df["rating"].astype(str).str.lower().str.contains("rx", na=False)
     mask_hentai_genre = df["genres"].apply(lambda v: contains_tag(v, "hentai")) if "genres" in df.columns else pd.Series(False, index=df.index)
     mask_hentai_theme = df["themes"].apply(lambda v: contains_tag(v, "hentai")) if "themes" in df.columns else pd.Series(False, index=df.index)
-    mask_content_block = mask_rx | mask_hentai_genre | mask_hentai_theme
+    mask_erotica_genre = df["genres"].apply(lambda v: contains_tag(v, "erotica")) if "genres" in df.columns else pd.Series(False, index=df.index)
+    mask_erotica_theme = df["themes"].apply(lambda v: contains_tag(v, "erotica")) if "themes" in df.columns else pd.Series(False, index=df.index)
+    mask_content_block = mask_rx | mask_hentai_genre | mask_hentai_theme | mask_erotica_genre | mask_erotica_theme
 
     # --- B. Data hygiene ---
     mask_dup = df["mal_id"].duplicated(keep="first")
@@ -98,7 +102,7 @@ def filter_content(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
 
     report = {
         "total_sebelum_filter": int(n_total),
-        "dihapus_konten__rating_rx_atau_hentai": int(mask_content_block.sum()),
+        "dihapus_konten__rating_rx_hentai_atau_erotica": int(mask_content_block.sum()),
         "dihapus_hygiene__duplikat_mal_id": int(mask_dup.sum()),
         "dihapus_hygiene__belum_tayang_info_minim": int(mask_unaired_empty.sum()),
         "dihapus_hygiene__semua_metadata_inti_kosong": int(mask_all_empty.sum()),
@@ -134,8 +138,15 @@ def build_document(row: pd.Series) -> str:
     season = clean_value(row.get("season"), default="")
     season_year = f"{season} {year}".strip() or "Tidak diketahui"
 
+    title = clean_value(row.get("title"))
+    title_en = clean_value(row.get("title_english"), default="")
+    if title_en and title_en.strip().lower() != title.strip().lower():
+        title_line = f"Judul: {title} ({title_en})"
+    else:
+        title_line = f"Judul: {title}"
+
     return (
-        f"Judul: {clean_value(row.get('title'))} ({clean_value(row.get('title_english'), default='')})\n"
+        f"{title_line}\n"
         f"Tipe: {clean_value(row.get('type'))} | Status: {clean_value(row.get('status'))} | "
         f"Episode: {clean_value(row.get('episodes'))} | Durasi: {clean_value(row.get('duration'))}\n"
         f"Genre: {clean_value(row.get('genres'))} | Tema: {clean_value(row.get('themes'))} | "
