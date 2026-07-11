@@ -77,7 +77,7 @@ def build_similarity_queries(df: pd.DataFrame, n: int = 35):
             "category": "similaritas_rekomendasi",
             "query": f"Aku suka {row['title']}, ada rekomendasi anime lain yang mirip?",
             "anchor_mal_id": int(row["mal_id"]),
-            "ground_truth_mal_ids": relevant[:30],  # batasi supaya file tidak membengkak
+            "ground_truth_mal_ids": relevant,  # daftar LENGKAP, tidak dipotong -- lihat catatan Recall@k
             "ground_truth_method": "semi_otomatis_overlap_genre_demografi",
             "needs_manual_validation": True,
         })
@@ -130,7 +130,7 @@ def build_attribute_queries(df: pd.DataFrame, n: int = 25):
             "id": f"ATTR-{i:03d}",
             "category": "filter_atribut",
             "query": f"Rekomendasikan anime {desc}",
-            "ground_truth_mal_ids": result["mal_id"].tolist()[:50],
+            "ground_truth_mal_ids": result["mal_id"].tolist(),  # daftar LENGKAP
             "ground_truth_method": "otomatis_filter_dataset",
             "needs_manual_validation": False,
         })
@@ -211,7 +211,7 @@ def build_multiturn_queries(df: pd.DataFrame, n: int = 12):
             "id": f"MULTI-{i:03d}",
             "category": "multi_turn_refinement",
             "query": scenario["turns"],  # list -> merepresentasikan giliran percakapan
-            "ground_truth_mal_ids": result["mal_id"].tolist()[:50],
+            "ground_truth_mal_ids": result["mal_id"].tolist(),  # daftar LENGKAP
             "ground_truth_method": "otomatis_filter_bertingkat",
             "needs_manual_validation": False,
         })

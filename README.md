@@ -6,16 +6,16 @@ Sistem rekomendasi anime yang menggabungkan retrieval semantik (FAISS) atas data
 
 ## Stack
 
-| Komponen | Teknologi |
-|---|---|
-| Dataset utama | [Anime & Manga Analytics Dataset (2026)](https://www.kaggle.com/datasets/patelris/anime-and-manga-dataset-2026) — Kaggle |
-| Data pelengkap | [Jikan API](https://jikan.moe/) (unofficial MyAnimeList REST API) |
-| Embedding | `sentence-transformers/all-MiniLM-L6-v2` |
-| Vector DB | FAISS |
-| Framework RAG | LangChain |
-| Model bahasa | SLM ±3B (kandidat utama: Llama-3.2-3B-Instruct), kuantisasi GGUF 4-bit |
-| UI | Gradio |
-| Deployment | Hugging Face Spaces |
+| Komponen       | Teknologi                                                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Dataset utama  | [Anime & Manga Analytics Dataset (2026)](https://www.kaggle.com/datasets/patelris/anime-and-manga-dataset-2026) — Kaggle |
+| Data pelengkap | [Jikan API](https://jikan.moe/) (unofficial MyAnimeList REST API)                                                        |
+| Embedding      | `sentence-transformers/all-MiniLM-L6-v2`                                                                                 |
+| Vector DB      | FAISS                                                                                                                    |
+| Framework RAG  | LangChain                                                                                                                |
+| Model bahasa   | SLM ±3B (kandidat utama: Llama-3.2-3B-Instruct), kuantisasi GGUF 4-bit                                                   |
+| UI             | Gradio                                                                                                                   |
+| Deployment     | Hugging Face Spaces                                                                                                      |
 
 ## Struktur Repo
 
@@ -47,18 +47,19 @@ skripsi-anime-rag/
 
 ## Alur Kerja: Script vs Notebook
 
-Prinsip yang dipakai di repo ini: **logika inti selalu ditulis sebagai modul `.py` di `src/`**, bukan langsung di notebook. Notebook hanya dipakai sebagai *runner* tipis untuk memanfaatkan GPU gratis di Kaggle, dengan meng-*import* modul yang sama.
+Prinsip yang dipakai di repo ini: **logika inti selalu ditulis sebagai modul `.py` di `src/`**, bukan langsung di notebook. Notebook hanya dipakai sebagai _runner_ tipis untuk memanfaatkan GPU gratis di Kaggle, dengan meng-_import_ modul yang sama.
 
-| Tahap | Butuh GPU? | Dijalankan sebagai |
-|---|---|---|
-| Minggu 1 — Preprocessing (`preprocess.py`) | Tidak | Script biasa di laptop |
-| Minggu 2 — Embedding + FAISS (`build_index.py`) | Opsional (lebih cepat dengan GPU) | Modul, dipanggil dari `notebooks/02_build_index_kaggle.ipynb` di Kaggle |
-| Minggu 3-4 — RAG pipeline + SLM (`rag_pipeline.py`) | Ya (inferensi LLM) | Modul, akan dipanggil dari notebook Kaggle serupa |
-| Minggu 5 — Enrichment API (`enrichment.py`) | Tidak | Script biasa (panggilan HTTP) |
+| Tahap                                               | Butuh GPU?                        | Dijalankan sebagai                                                      |
+| --------------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------- |
+| Minggu 1 — Preprocessing (`preprocess.py`)          | Tidak                             | Script biasa di laptop                                                  |
+| Minggu 2 — Embedding + FAISS (`build_index.py`)     | Opsional (lebih cepat dengan GPU) | Modul, dipanggil dari `notebooks/02_build_index_kaggle.ipynb` di Kaggle |
+| Minggu 3-4 — RAG pipeline + SLM (`rag_pipeline.py`) | Ya (inferensi LLM)                | Modul, akan dipanggil dari notebook Kaggle serupa                       |
+| Minggu 5 — Enrichment API (`enrichment.py`)         | Tidak                             | Script biasa (panggilan HTTP)                                           |
 
-Keuntungan pola ini: kode tetap bisa di-*review* dan di-*diff* di Git (bukan tersebar di sel-sel notebook), sekaligus tetap bisa memanfaatkan GPU gratis Kaggle tanpa menulis ulang logika.
+Keuntungan pola ini: kode tetap bisa di-_review_ dan di-_diff_ di Git (bukan tersebar di sel-sel notebook), sekaligus tetap bisa memanfaatkan GPU gratis Kaggle tanpa menulis ulang logika.
 
 **Cara pakai `notebooks/02_build_index_kaggle.ipynb` di Kaggle:**
+
 1. Upload notebook ini ke Kaggle, aktifkan GPU (Settings → Accelerator) dan Internet (Settings → Internet)
 2. Upload `anime_documents.jsonl` (hasil Minggu 1) sebagai Kaggle Dataset input, atau sesuaikan path di sel notebook
 3. Jalankan seluruh sel — notebook akan `git clone` repo ini, lalu memanggil `src/build_index.py` langsung
@@ -97,17 +98,18 @@ python3 src/preprocess.py
 ```
 
 Output:
+
 - `data/processed/anime_filtered.csv` — dataset setelah filtering
 - `data/processed/anime_documents.jsonl` — dokumen siap-embedding (satu baris JSON per anime)
 - `data/processed/filtering_report.json` — laporan jumlah entri yang difilter (untuk dilampirkan di bab metodologi)
 
 ### Kebijakan Filtering (ringkas)
 
-| Kategori | Kriteria | Alasan |
-|---|---|---|
-| Konten | `rating` memuat "Rx", atau `genres`/`themes` memuat "Hentai" | Batasan konten wajib (Bagian 3.1) |
-| Data hygiene | Duplikat `mal_id`, status "Not yet aired" + sinopsis kosong, metadata inti kosong semua | Kebersihan data, bukan kurasi kualitas |
-| **Tidak difilter** | Skor rendah, popularitas rendah, tag "Ecchi" | Menjaga cakupan retrieval & menghindari bias komunitas MAL |
+| Kategori           | Kriteria                                                                                | Alasan                                                     |
+| ------------------ | --------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Konten             | `rating` memuat "Rx", atau `genres`/`themes` memuat "Hentai"                            | Batasan konten wajib (Bagian 3.1)                          |
+| Data hygiene       | Duplikat `mal_id`, status "Not yet aired" + sinopsis kosong, metadata inti kosong semua | Kebersihan data, bukan kurasi kualitas                     |
+| **Tidak difilter** | Skor rendah, popularitas rendah, tag "Ecchi"                                            | Menjaga cakupan retrieval & menghindari bias komunitas MAL |
 
 > **Update kebijakan (ditemukan saat eksplorasi data):** genre "Erotica" (berbeda dari "Ecchi") menandakan
 > konten seksual eksplisit, sehingga ditambahkan ke daftar filter konten sejajar dengan "Hentai".
@@ -125,7 +127,17 @@ python3 src/evaluate_retrieval.py      # hitung Recall@k & MRR untuk k=3/5/10 ->
 
 Setelah melihat hasilnya, isi `retrieval.top_k_final` di `configs/config.yaml` dengan nilai k terpilih.
 
-**Catatan validasi:** 35 query kategori `similaritas_rekomendasi` punya ground truth *semi-otomatis*
+**Cara membaca hasil evaluasi:**
+
+- Kategori **faktual** (1 jawaban benar per query) → baca **Recall@k dan MRR** sebagai metrik utama.
+- Kategori **filter_atribut**, **similaritas_rekomendasi**, **multi_turn_refinement** (bisa ratusan
+  hingga ribuan jawaban valid per query, karena kriterianya longgar) → baca **Precision@k** sebagai
+  metrik utama. Recall@k di kategori ini akan **selalu kecil/mendekati 0 secara struktural**
+  (k=10 dibagi ratusan/ribuan kandidat valid), bukan berarti retrieval gagal -- ini keterbatasan
+  definisi ground truth, bukan kualitas sistem. Precision@k menjawab pertanyaan yang relevan bagi
+  user: dari k rekomendasi yang ditampilkan, berapa yang benar-benar valid?
+
+**Catatan validasi:** 35 query kategori `similaritas_rekomendasi` punya ground truth _semi-otomatis_
 (overlap genre + demografi) dan wajib divalidasi manual pada subset (`needs_manual_validation: true`
 di `tests/test_set.jsonl`) sebelum dilaporkan sebagai metrik final di skripsi -- lihat Bagian 6.3
 dokumen rincian project.

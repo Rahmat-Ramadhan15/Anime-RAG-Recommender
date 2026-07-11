@@ -1,0 +1,98 @@
+{
+  "k=3": {
+    "similaritas_rekomendasi": {
+      "n_query": 35,
+      "mean_recall": 0.0008,
+      "mean_precision": 0.1333,
+      "mrr": 0.1857
+    },
+    "__overall__": {
+      "n_query": 89,
+      "mean_recall": 0.0687,
+      "mean_precision": 0.1348,
+      "mrr": 0.2416
+    },
+    "filter_atribut": {
+      "n_query": 25,
+      "mean_recall": 0.0035,
+      "mean_precision": 0.2133,
+      "mrr": 0.4
+    },
+    "faktual": {
+      "n_query": 17,
+      "mean_recall": 0.3529,
+      "mean_precision": 0.1176,
+      "mrr": 0.2941
+    },
+    "multi_turn_refinement": {
+      "n_query": 12,
+      "mean_recall": 0.0,
+      "mean_precision": 0.0,
+      "mrr": 0.0
+    }
+  },
+  "k=5": {
+    "similaritas_rekomendasi": {
+      "n_query": 35,
+      "mean_recall": 0.0008,
+      "mean_precision": 0.0914,
+      "mrr": 0.1914
+    },
+    "__overall__": {
+      "n_query": 89,
+      "mean_recall": 0.0689,
+      "mean_precision": 0.1079,
+      "mrr": 0.2438
+    },
+    "filter_atribut": {
+      "n_query": 25,
+      "mean_recall": 0.0039,
+      "mean_precision": 0.208,
+      "mrr": 0.4
+    },
+    "faktual": {
+      "n_query": 17,
+      "mean_recall": 0.3529,
+      "mean_precision": 0.0706,
+      "mrr": 0.2941
+    },
+    "multi_turn_refinement": {
+      "n_query": 12,
+      "mean_recall": 0.0,
+      "mean_precision": 0.0,
+      "mrr": 0.0
+    }
+  },
+  "k=10": {
+    "similaritas_rekomendasi": {
+      "n_query": 35,
+      "mean_recall": 0.0016,
+      "mean_precision": 0.0657,
+      "mrr": 0.1987
+    },
+    "__overall__": {
+      "n_query": 89,
+      "mean_recall": 0.0696,
+      "mean_precision": 0.0966,
+      "mrr": 0.2515
+    },
+    "filter_atribut": {
+      "n_query": 25,
+      "mean_recall": 0.0055,
+      "mean_precision": 0.216,
+      "mrr": 0.4
+    },
+    "faktual": {
+      "n_query": 17,
+      "mean_recall": 0.3529,
+      "mean_precision": 0.0353,
+      "mrr": 0.2941
+    },
+    "multi_turn_refinement": {
+      "n_query": 12,
+      "mean_recall": 0.0003,
+      "mean_precision": 0.025,
+      "mrr": 0.0357
+    }
+  }
+}

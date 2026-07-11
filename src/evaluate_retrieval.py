@@ -45,10 +45,20 @@ def load_test_set():
 
 
 def recall_at_k(retrieved_ids, ground_truth_ids):
+    """Recall@k = proporsi ground truth yang berhasil ditemukan dalam top-k. TIDAK PERNAH turun saat k naik."""
     if not ground_truth_ids:
         return None
     hit = len(set(retrieved_ids) & set(ground_truth_ids))
-    return hit / min(len(ground_truth_ids), len(retrieved_ids)) if len(retrieved_ids) < len(ground_truth_ids) else hit / len(ground_truth_ids)
+    return hit / len(ground_truth_ids)
+
+
+def precision_at_k(retrieved_ids, ground_truth_ids):
+    """Precision@k = proporsi hasil top-k yang valid/relevan. Metrik utama untuk kategori
+    dengan ground truth besar (filter_atribut, similaritas, multi_turn) -- lihat catatan di README."""
+    if not ground_truth_ids or not retrieved_ids:
+        return None
+    hit = len(set(retrieved_ids) & set(ground_truth_ids))
+    return hit / len(retrieved_ids)
 
 
 def reciprocal_rank(retrieved_ids, ground_truth_ids):
@@ -92,20 +102,23 @@ def main():
         for k in top_k_candidates:
             retrieved_k = retrieved_all[:k]
             r = recall_at_k(retrieved_k, q["ground_truth_mal_ids"])
+            p = precision_at_k(retrieved_k, q["ground_truth_mal_ids"])
             rr = reciprocal_rank(retrieved_k, q["ground_truth_mal_ids"])
-            results[k][q["category"]].append((r, rr))
-            results[k]["__overall__"].append((r, rr))
+            results[k][q["category"]].append((r, p, rr))
+            results[k]["__overall__"].append((r, p, rr))
 
     # Ringkas jadi rata-rata per kategori per k
     summary = {}
     for k in top_k_candidates:
         summary[f"k={k}"] = {}
-        for cat, pairs in results[k].items():
-            recalls = [r for r, _ in pairs if r is not None]
-            rrs = [rr for _, rr in pairs]
+        for cat, triples in results[k].items():
+            recalls = [r for r, _, _ in triples if r is not None]
+            precisions = [p for _, p, _ in triples if p is not None]
+            rrs = [rr for _, _, rr in triples]
             summary[f"k={k}"][cat] = {
-                "n_query": len(pairs),
+                "n_query": len(triples),
                 "mean_recall": round(sum(recalls) / len(recalls), 4) if recalls else None,
+                "mean_precision": round(sum(precisions) / len(precisions), 4) if precisions else None,
                 "mrr": round(sum(rrs) / len(rrs), 4) if rrs else None,
             }
 
@@ -113,19 +126,26 @@ def main():
     with open(REPORT_PATH, "w", encoding="utf-8") as f:
         json.dump(summary, f, ensure_ascii=False, indent=2)
 
-    print("\n=== Ringkasan Recall@k & MRR ===")
+    print("\n=== Ringkasan Recall@k, Precision@k, & MRR ===")
     for k_label, cats in summary.items():
         overall = cats["__overall__"]
-        print(f"{k_label}: Recall={overall['mean_recall']}, MRR={overall['mrr']} (n={overall['n_query']})")
+        print(f"{k_label}: Recall={overall['mean_recall']}, Precision={overall['mean_precision']}, MRR={overall['mrr']} (n={overall['n_query']})")
         for cat, stats in cats.items():
             if cat == "__overall__":
                 continue
-            print(f"    {cat:28s} Recall={stats['mean_recall']}, MRR={stats['mrr']} (n={stats['n_query']})")
+            print(f"    {cat:28s} Recall={stats['mean_recall']}, Precision={stats['mean_precision']}, MRR={stats['mrr']} (n={stats['n_query']})")
 
     print(f"\nLaporan lengkap: {REPORT_PATH}")
     print(
-        "\n[CATATAN] Pilih k final dengan trade-off: Recall lebih tinggi vs konteks "
-        "lebih panjang yang harus diproses model 3B (memengaruhi latensi & fokus jawaban)."
+        "\n[CATATAN INTERPRETASI]\n"
+        "- Kategori 'faktual' (1 jawaban benar): baca Recall@k & MRR sebagai metrik utama.\n"
+        "- Kategori 'filter_atribut', 'similaritas_rekomendasi', 'multi_turn_refinement' (ratusan\n"
+        "  jawaban valid per query): baca Precision@k sebagai metrik utama -- Recall@k akan SELALU\n"
+        "  kecil secara struktural di kategori ini (k kecil dibagi ratusan kandidat valid), bukan\n"
+        "  berarti sistem buruk. Precision@k menjawab pertanyaan yang relevan bagi user: 'dari k\n"
+        "  rekomendasi yang ditampilkan, berapa yang benar-benar valid?'\n"
+        "- Pilih k final dengan trade-off: Precision lebih tinggi vs konteks lebih panjang yang\n"
+        "  harus diproses model 3B (memengaruhi latensi & fokus jawaban)."
     )
 
 
