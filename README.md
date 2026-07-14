@@ -35,10 +35,14 @@ skripsi-anime-rag/
 │   ├── build_index.py          # Minggu 2 -- DONE (modul portable CPU/GPU)
 │   ├── rag_pipeline.py         # Minggu 3-4 -- DONE (modul, mendukung Kondisi A/B/C)
 │   ├── enrichment.py           # Minggu 5 -- DONE (Jikan API client, rate limit + cache)
-│   └── guardrails.py           # Minggu 5 -- DONE (deteksi & tolak konten eksplisit)
+│   ├── guardrails.py           # Minggu 5 -- DONE (deteksi & tolak konten eksplisit)
+│   ├── run_experiment.py       # Minggu 7 -- DONE (jalankan 99 query x 3 kondisi, butuh GPU/Kaggle)
+│   ├── llm_judge.py            # Minggu 7 -- DONE (LLM-as-a-Judge via Gemini, tidak butuh GPU)
+│   └── analyze_results.py      # Minggu 7 -- DONE (Wilcoxon signed-rank, refusal rate, tidak butuh GPU)
 ├── notebooks/
 │   ├── 02_build_index_kaggle.ipynb   # runner Kaggle GPU untuk build_index.py
-│   └── 03_rag_pipeline_kaggle.ipynb  # runner Kaggle GPU untuk rag_pipeline.py
+│   ├── 03_rag_pipeline_kaggle.ipynb  # runner Kaggle GPU untuk rag_pipeline.py
+│   └── 04_run_experiment_kaggle.ipynb # runner Kaggle GPU untuk run_experiment.py
 ├── tests/                      # 100 query test set + ground truth (Minggu 4)
 └── docs/
     ├── Dokumen_Rincian_Project_Skripsi.docx
@@ -85,6 +89,8 @@ Unduh `anime_dataset.csv` dari Kaggle (link di atas) dan letakkan di `data/raw/a
 - [x] **Minggu 4** — Test set 99 query + ground truth lengkap, evaluasi Recall@k/Precision@k/MRR selesai. **k final = 5** (lihat `configs/config.yaml`). Temuan penting: retrieval semantik murni lemah pada constraint numerik (episode/rating) di query multi-turn -- dicatat sebagai keterbatasan arsitektural untuk bab pembahasan.
 - [x] **Minggu 5** — `enrichment.py`: Jikan API client dengan rate limit (~1 req/detik) dan cache snapshot JSON di `data/api_cache/` untuk reproducibility. `guardrails.py`: deteksi & tolak query eksplisit LANGSUNG sebelum panggil LLM (Lapisan 3), terintegrasi ke `rag_pipeline.py`. Poster tetap dari `image_url` dataset (bukan Jikan) sesuai keputusan sebelumnya.
 - [x] **Minggu 6** — Kondisi A (baseline SLM murni) **sudah otomatis tercakup** sejak Minggu 3, karena `generate()` dirancang satu fungsi untuk ketiga kondisi lewat flag `use_retrieval`/`use_enrichment` (bukan tiga implementasi terpisah). Tidak ada pekerjaan tambahan di sini -- lebih cepat dari jadwal.
+- [x] **Minggu 7** — Eksperimen penuh 99 query x 3 kondisi (`run_experiment.py`, GPU/Kaggle), LLM-as-a-Judge via Gemini (`llm_judge.py`, tidak butuh GPU), analisis Wilcoxon signed-rank + refusal rate (`analyze_results.py`, tidak butuh GPU)
+- [ ] **Minggu 8** — Snapshot Jikan API final, tinjau ulang `tests/final_evaluation_report.json` untuk bab hasil
 - [ ] **Minggu 7** — Evaluasi otomatis (Recall@k/MRR) + LLM-as-a-Judge
 - [ ] **Minggu 8** — Snapshot Jikan API, analisis statistik (Wilcoxon signed-rank)
 - [ ] **Minggu 9** — Human evaluation, UI Gradio, deployment HF Spaces
@@ -174,6 +180,38 @@ tersedia di negara Anda" -- ini pembatasan wilayah oleh pengunggah/pemegang hak 
 di luar kendali sistem kita. URL yang dihasilkan `enrichment.py` sudah benar (bisa dicek
 lewat `youtube_id`-nya), pembatasannya murni dari sisi platform YouTube berdasarkan lokasi
 pengakses. Sebutkan ini sebagai keterbatasan sumber data eksternal di bab keterbatasan skripsi.
+
+## Menjalankan Minggu 7 (Eksperimen Penuh + LLM-as-a-Judge)
+
+Tiga tahap, dua di antaranya TIDAK butuh GPU:
+
+**Tahap 1 (butuh GPU/Kaggle)** -- jalankan `notebooks/04_run_experiment_kaggle.ipynb`:
+menjalankan 99 query x 3 kondisi (297 pemanggilan LLM), hasil `tests/experiment_results.jsonl`.
+Unduh file ini dari panel Output Kaggle, taruh di `tests/` repo lokal Anda.
+
+**Tahap 2 (tidak butuh GPU, hanya internet)** -- di laptop:
+
+```bash
+# Set API key dulu (dapatkan gratis di aistudio.google.com/apikey)
+$env:GEMINI_API_KEY="xxx"          # PowerShell
+# atau: export GEMINI_API_KEY=xxx  # Linux/Mac
+
+python src/llm_judge.py
+```
+
+Menilai setiap jawaban dengan model BEDA dari generator (Gemini, bukan Llama-3.2-3B) supaya
+tidak self-preference bias -- lihat Bagian 6.2 dokumen rincian project. Hasil:
+`tests/judge_scores.jsonl`.
+
+**Tahap 3 (tidak butuh GPU/internet, murni statistik)** -- di laptop:
+
+```bash
+python src/analyze_results.py
+```
+
+Menghasilkan `tests/final_evaluation_report.json`: skor kualitas per kondisi/kategori,
+uji Wilcoxon signed-rank berpasangan (A vs B, B vs C), dan refusal rate untuk kategori
+out-of-scope/adversarial. Ini yang dilampirkan ke bab hasil skripsi.
 
 Lihat `docs/Dokumen_Rincian_Project_Skripsi.docx` untuk pembahasan lengkap alasan akademik di balik setiap keputusan.
 
