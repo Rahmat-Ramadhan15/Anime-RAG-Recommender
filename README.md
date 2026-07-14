@@ -34,8 +34,8 @@ skripsi-anime-rag/
 │   ├── preprocess.py           # Minggu 1 -- DONE (script, CPU, tidak butuh GPU)
 │   ├── build_index.py          # Minggu 2 -- DONE (modul portable CPU/GPU)
 │   ├── rag_pipeline.py         # Minggu 3-4 -- DONE (modul, mendukung Kondisi A/B/C)
-│   ├── enrichment.py           # Minggu 5 -- TODO
-│   └── guardrails.py           # Minggu 5 -- TODO
+│   ├── enrichment.py           # Minggu 5 -- DONE (Jikan API client, rate limit + cache)
+│   └── guardrails.py           # Minggu 5 -- DONE (deteksi & tolak konten eksplisit)
 ├── notebooks/
 │   ├── 02_build_index_kaggle.ipynb   # runner Kaggle GPU untuk build_index.py
 │   └── 03_rag_pipeline_kaggle.ipynb  # runner Kaggle GPU untuk rag_pipeline.py
@@ -82,9 +82,9 @@ Unduh `anime_dataset.csv` dari Kaggle (link di atas) dan letakkan di `data/raw/a
 - [x] **Minggu 1** — Preprocessing data: verifikasi `mal_id`, filtering rating Rx/Hentai, data hygiene (duplikat, status belum tayang + info minim), desain template chunking
 - [x] **Minggu 2** — Modul embedding + FAISS indexing (`build_index.py`) siap, portable CPU/GPU; notebook runner Kaggle tersedia
 - [x] **Minggu 3** — Modul `rag_pipeline.py` siap dan terverifikasi di Kaggle GPU: retrieval top-k, chat template resmi Llama-3.x (bukan prompt mentah), guardrail dasar di system prompt, mendukung Kondisi A/B/C langsung lewat satu fungsi `generate()`. Kondisi A terbukti berhalusinasi (contoh: kesalahan genre & karakter karangan) -- bukti kualitatif awal untuk argumen kebutuhan RAG.
-- [x] **Minggu 4** — Generator 100 query test set + ground truth (`tests/build_test_set.py`, tidak butuh GPU); script evaluasi Recall@k/MRR (`src/evaluate_retrieval.py`, tidak butuh GPU) siap dijalankan
-- [ ] **Minggu 5** — Enrichment via Jikan API (Kondisi C), guardrail konten, system prompt out-of-scope handling
-- [ ] **Minggu 6** — Implementasi Kondisi A (baseline SLM murni)
+- [x] **Minggu 4** — Test set 99 query + ground truth lengkap, evaluasi Recall@k/Precision@k/MRR selesai. **k final = 5** (lihat `configs/config.yaml`). Temuan penting: retrieval semantik murni lemah pada constraint numerik (episode/rating) di query multi-turn -- dicatat sebagai keterbatasan arsitektural untuk bab pembahasan.
+- [x] **Minggu 5** — `enrichment.py`: Jikan API client dengan rate limit (~1 req/detik) dan cache snapshot JSON di `data/api_cache/` untuk reproducibility. `guardrails.py`: deteksi & tolak query eksplisit LANGSUNG sebelum panggil LLM (Lapisan 3), terintegrasi ke `rag_pipeline.py`. Poster tetap dari `image_url` dataset (bukan Jikan) sesuai keputusan sebelumnya.
+- [x] **Minggu 6** — Kondisi A (baseline SLM murni) **sudah otomatis tercakup** sejak Minggu 3, karena `generate()` dirancang satu fungsi untuk ketiga kondisi lewat flag `use_retrieval`/`use_enrichment` (bukan tiga implementasi terpisah). Tidak ada pekerjaan tambahan di sini -- lebih cepat dari jadwal.
 - [ ] **Minggu 7** — Evaluasi otomatis (Recall@k/MRR) + LLM-as-a-Judge
 - [ ] **Minggu 8** — Snapshot Jikan API, analisis statistik (Wilcoxon signed-rank)
 - [ ] **Minggu 9** — Human evaluation, UI Gradio, deployment HF Spaces
@@ -141,6 +141,39 @@ Setelah melihat hasilnya, isi `retrieval.top_k_final` di `configs/config.yaml` d
 (overlap genre + demografi) dan wajib divalidasi manual pada subset (`needs_manual_validation: true`
 di `tests/test_set.jsonl`) sebelum dilaporkan sebagai metrik final di skripsi -- lihat Bagian 6.3
 dokumen rincian project.
+
+## Menjalankan Minggu 5 (Enrichment + Guardrail)
+
+Enrichment butuh koneksi internet (panggilan ke Jikan API), tidak butuh GPU:
+
+```bash
+python3 src/enrichment.py    # uji cepat: ambil data 3 anime contoh, cek data/api_cache/
+python3 src/guardrails.py    # uji cepat: cek deteksi query eksplisit vs query normal
+```
+
+`rag_pipeline.py` otomatis memakai keduanya:
+
+- Setiap `generate()` dipanggil, query dicek dulu lewat `guard_query()` -- kalau terdeteksi
+  eksplisit, langsung ditolak tanpa memanggil retrieval maupun LLM sama sekali (Lapisan 3).
+- Kondisi C sekarang memanggil `pipe.enrich(mal_ids)` untuk data Jikan API sungguhan
+  (status tayang, episode terkini, trailer), bukan lagi placeholder kosong.
+
+Cache respons API tersimpan di `data/api_cache/<mal_id>.json` (gitignored) -- ini snapshot
+untuk reproducibility (Bagian 6.6), simpan folder ini secara terpisah (mis. zip manual) kalau
+mau melampirkan bukti data mentah di lampiran skripsi.
+
+**Catatan keandalan Jikan API:** error `504 Gateway Timeout` sesekali itu wajar -- Jikan API
+gratis tanpa SLA (sudah dicatat sebagai keterbatasan sejak awal). `enrichment.py` sudah
+memakai endpoint dasar (bukan `/full`, yang membawa data relasi/streaming yang tidak kita
+butuhkan dan lebih berat) plus retry otomatis (3x percobaan, backoff 2/4/6 detik) untuk
+error 502/503/504. Kalau tetap gagal setelah retry, query itu dilewati (dicatat sebagai
+`{}` -- enrichment kosong, bukan error yang menghentikan seluruh proses).
+
+**Catatan keterbatasan (bukan bug):** sebagian trailer YouTube bisa muncul "Video tidak
+tersedia di negara Anda" -- ini pembatasan wilayah oleh pengunggah/pemegang hak di YouTube,
+di luar kendali sistem kita. URL yang dihasilkan `enrichment.py` sudah benar (bisa dicek
+lewat `youtube_id`-nya), pembatasannya murni dari sisi platform YouTube berdasarkan lokasi
+pengakses. Sebutkan ini sebagai keterbatasan sumber data eksternal di bab keterbatasan skripsi.
 
 Lihat `docs/Dokumen_Rincian_Project_Skripsi.docx` untuk pembahasan lengkap alasan akademik di balik setiap keputusan.
 

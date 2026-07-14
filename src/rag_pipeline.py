@@ -27,6 +27,7 @@ from sentence_transformers import SentenceTransformer
 from langchain_core.prompts import PromptTemplate
 
 from build_index import load_config, detect_device, load_documents
+from guardrails import guard_query
 
 
 SYSTEM_PROMPT = """Anda adalah asisten rekomendasi anime berbahasa Indonesia.
@@ -60,6 +61,7 @@ class RagPipeline:
     """
 
     def __init__(self, config_path: str = "configs/config.yaml", device: str | None = None):
+        self.config_path = config_path
         self.cfg = load_config(config_path)
         self.device = device or detect_device()
         print(f"[INFO] Device: {self.device}")
@@ -74,6 +76,7 @@ class RagPipeline:
         self.llm = None  # diisi oleh load_llm()
         self.tokenizer = None
         self.terminators = None
+        self._jikan_client = None  # diisi lazy oleh enrich()
 
     def load_index(self, index_dir: str = "data/index"):
         index_dir = Path(index_dir)
@@ -130,6 +133,18 @@ class RagPipeline:
 
         print(f"[OK] LLM dimuat: {model_name} (quantize={quantize})")
 
+    def enrich(self, mal_ids: list[int], use_cache: bool = True) -> dict:
+        """
+        Ambil data enrichment (Jikan API) untuk daftar mal_id hasil retrieval.
+        Dipakai Kondisi C -- lihat src/enrichment.py untuk rate limiting & cache.
+        Lazy import supaya `requests` tidak wajib ter-install kalau hanya mau
+        pakai Kondisi A/B.
+        """
+        if self._jikan_client is None:
+            from enrichment import JikanClient
+            self._jikan_client = JikanClient(self.config_path)
+        return self._jikan_client.enrich_batch(mal_ids, use_cache=use_cache)
+
     def retrieve(self, query: str, k: int = 5):
         """Retrieval top-k. Dipakai oleh Kondisi B & C, dilewati oleh Kondisi A."""
         q_emb = self.embed_model.encode([query], normalize_embeddings=True).astype("float32")
@@ -178,6 +193,18 @@ class RagPipeline:
         """
         k = k or self.cfg["retrieval"]["top_k_final"] or 5
 
+        # Lapisan 3: tolak LANGSUNG kalau query eksplisit -- tidak perlu panggil
+        # retrieval maupun LLM sama sekali (lebih cepat, jaring pengaman kalau
+        # system prompt/Lapisan 2 gagal menolak dengan benar).
+        refusal = guard_query(query)
+        if refusal is not None:
+            return {
+                "query": query,
+                "condition": "BLOCKED",
+                "retrieved_mal_ids": [],
+                "answer": refusal,
+            }
+
         retrieved = self.retrieve(query, k=k) if use_retrieval else []
         context = self.build_context(retrieved, enrichment_data if use_enrichment else None)
 
@@ -215,10 +242,16 @@ if __name__ == "__main__":
 
     # Contoh menjalankan ketiga kondisi untuk satu query yang sama
     query = "Rekomendasikan anime action dengan tema luar angkasa"
+
+    # Kondisi C butuh enrichment_data sungguhan: retrieval dulu untuk dapat mal_id,
+    # baru panggil Jikan API (rate limit ~1 req/detik, jadi ini bagian paling lambat)
+    retrieved_for_enrichment = pipe.retrieve(query, k=pipe.cfg["retrieval"]["top_k_final"])
+    enrichment_data = pipe.enrich([d["mal_id"] for d in retrieved_for_enrichment])
+
     for cond_name, kwargs in [
         ("A", {"use_retrieval": False}),
         ("B", {"use_retrieval": True, "use_enrichment": False}),
-        ("C", {"use_retrieval": True, "use_enrichment": True, "enrichment_data": {}}),
+        ("C", {"use_retrieval": True, "use_enrichment": True, "enrichment_data": enrichment_data}),
     ]:
         result = pipe.generate(query, **kwargs)
         print(f"\n=== Kondisi {cond_name} ===")
