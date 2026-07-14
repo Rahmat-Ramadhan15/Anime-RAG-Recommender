@@ -9,9 +9,9 @@ data:
 
 content_policy:
   # Bagian 3.1 dokumen rincian project (diperluas: Erotica ditambahkan setelah ditemukan di data)
-  block_rating_contains: ["rx"]        # match case-insensitive pada kolom rating
-  block_tag: ["hentai", "erotica"]      # dicek di kolom genres & themes
-  allow_tag: ["ecchi"]                  # eksplisit TIDAK difilter (dokumentasi kebijakan)
+  block_rating_contains: ["rx"] # match case-insensitive pada kolom rating
+  block_tag: ["hentai", "erotica"] # dicek di kolom genres & themes
+  allow_tag: ["ecchi"] # eksplisit TIDAK difilter (dokumentasi kebijakan)
 
 data_hygiene:
   # Bukan filter kualitas/skor -- lihat analisis strategi dataset
@@ -27,8 +27,11 @@ embedding:
   synopsis_max_chars: 1000
 
 retrieval:
-  top_k_candidates: [3, 5, 10]   # diuji Minggu 4, nilai final diisi setelah eksperimen
-  top_k_final: null
+  top_k_candidates: [3, 5, 10] # sudah diuji Minggu 4 -- lihat tests/topk_evaluation_report.json
+  top_k_final:
+    5 # dipilih berdasarkan trade-off precision vs MRR (precision turun jelas
+    # seiring k naik: 0.1348 -> 0.1079 -> 0.0966, MRR nyaris flat 0.24-0.25;
+    # k=5 titik tengah yang wajar. Ganti ke 3 kalau ingin memaksimalkan presisi.
 
 llm:
   model_name: "meta-llama/Llama-3.2-3B-Instruct"
@@ -49,5 +52,5 @@ evaluation:
     faktual_enrichment: "15-20%"
     multi_turn_refinement: "10-15%"
     out_of_scope: "~10%"
-  llm_judge_model: "gemini-flash"   # ganti sesuai model judge yang dipakai
+  llm_judge_model: "gemini-flash" # ganti sesuai model judge yang dipakai
   human_eval_sample_size: 15
