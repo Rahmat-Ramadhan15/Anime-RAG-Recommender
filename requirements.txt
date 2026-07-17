@@ -27,4 +27,4 @@ gradio>=4.30
 
 # --- Evaluasi ---
 scipy>=1.11          # Wilcoxon signed-rank test
-google-generativeai>=0.5   # LLM-as-a-Judge (Gemini API, tier gratis)
+google-genai>=0.3    # LLM-as-a-Judge (Gemini API, tier gratis) -- paket google-generativeai sudah deprecated

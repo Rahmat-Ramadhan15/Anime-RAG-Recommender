@@ -196,6 +196,7 @@ Unduh file ini dari panel Output Kaggle, taruh di `tests/` repo lokal Anda.
 $env:GEMINI_API_KEY="xxx"          # PowerShell
 # atau: export GEMINI_API_KEY=xxx  # Linux/Mac
 
+pip install google-genai   # paket google-generativeai sudah deprecated per pertengahan 2026
 python src/llm_judge.py
 ```
 

@@ -5,8 +5,9 @@ Menilai tests/experiment_results.jsonl (hasil src/run_experiment.py) memakai
 model judge yang BEDA dari model generator (Llama-3.2-3B) untuk menghindari
 self-preference bias (Bagian 6.2 dokumen rincian project).
 
-Default: Gemini API (tier gratis). Tidak butuh GPU -- hanya internet.
-Perlu GEMINI_API_KEY di environment variable:
+Default: Gemini API (tier gratis) lewat paket `google-genai` (SDK resmi terbaru --
+paket lama `google-generativeai` sudah dihentikan Google per pertengahan 2026).
+Tidak butuh GPU -- hanya internet. Perlu GEMINI_API_KEY di environment variable:
   PowerShell : $env:GEMINI_API_KEY="xxx"
   Linux/Mac  : export GEMINI_API_KEY=xxx
 
@@ -64,8 +65,15 @@ def load_results():
         return [json.loads(line) for line in f]
 
 
-def call_gemini(prompt: str, model_name: str = "gemini-1.5-flash", max_retries: int = 3) -> str:
-    import google.generativeai as genai
+def call_gemini(prompt: str, model_name: str = "gemini-3.1-flash-lite", max_retries: int = 3) -> str:
+    """
+    Memakai paket `google-genai` (SDK baru) -- paket lama `google-generativeai`
+    sudah dihentikan total oleh Google. Model default `gemini-3.1-flash-lite`:
+    stabil, murah, cocok untuk tugas judging berulang (297 panggilan).
+    Cek https://ai.google.dev/gemini-api/docs/models untuk model terbaru kalau
+    nama ini juga sudah di-deprecate di kemudian hari.
+    """
+    from google import genai
 
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
@@ -73,12 +81,11 @@ def call_gemini(prompt: str, model_name: str = "gemini-1.5-flash", max_retries: 
             "GEMINI_API_KEY tidak ditemukan. Set dulu environment variable-nya "
             "(lihat docstring di bagian atas file ini)."
         )
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(model_name)
+    client = genai.Client(api_key=api_key)
 
     for attempt in range(1, max_retries + 1):
         try:
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(model=model_name, contents=prompt)
             return response.text
         except Exception as e:
             print(f"[WARN] Gemini API gagal (percobaan {attempt}/{max_retries}): {e}")
@@ -120,7 +127,7 @@ def main():
 
             record = {**r, "judge": judge_result}
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
-            time.sleep(1)  # jaga-jaga rate limit tier gratis Gemini
+            time.sleep(6)  # jaga-jaga rate limit tier gratis Gemini
 
     print(f"\n[OK] {n_ok} berhasil dinilai, {n_error} gagal. Tersimpan: {OUT_PATH}")
 
