@@ -64,15 +64,23 @@ def analyze_refusal(records):
 def analyze_quality(records):
     by_cond_cat = defaultdict(list)
     scores_by_query = defaultdict(dict)  # {query_id: {condition: score}}
+    # Breakdown per kriteria (relevansi/akurasi_faktual/koherensi) -- untuk diagnosis
+    criteria_by_cond = defaultdict(lambda: defaultdict(list))  # {condition: {kriteria: [nilai]}}
 
     for r in records:
         if r["category"] in REFUSAL_CATEGORIES:
             continue
-        score = combined_score(r.get("judge", {}))
+        judge = r.get("judge", {})
+        score = combined_score(judge)
         if score is None:
             continue
         by_cond_cat[(r["condition"], r["category"])].append(score)
         scores_by_query[r["query_id"]][r["condition"]] = score
+
+        for kriteria in ["relevansi", "akurasi_faktual", "koherensi"]:
+            val = judge.get(kriteria)
+            if isinstance(val, (int, float)):
+                criteria_by_cond[r["condition"]][kriteria].append(val)
 
     summary = {}
     for (cond, cat), scores in by_cond_cat.items():
@@ -80,7 +88,15 @@ def analyze_quality(records):
             "n_query": len(scores),
             "mean_score": round(sum(scores) / len(scores), 4),
         }
-    return summary, scores_by_query
+
+    criteria_summary = {}
+    for cond, kriteria_dict in criteria_by_cond.items():
+        criteria_summary[cond] = {
+            kriteria: round(sum(vals) / len(vals), 4)
+            for kriteria, vals in kriteria_dict.items()
+        }
+
+    return summary, scores_by_query, criteria_summary
 
 
 def run_wilcoxon(scores_by_query):
@@ -118,12 +134,13 @@ def run_wilcoxon(scores_by_query):
 def main():
     records = load_judge_scores()
 
-    quality_summary, scores_by_query = analyze_quality(records)
+    quality_summary, scores_by_query, criteria_summary = analyze_quality(records)
     wilcoxon_results = run_wilcoxon(scores_by_query)
     refusal_summary = analyze_refusal(records)
 
     report = {
         "kualitas_jawaban_per_kondisi_kategori": quality_summary,
+        "breakdown_per_kriteria_per_kondisi": criteria_summary,
         "uji_wilcoxon_signed_rank": wilcoxon_results,
         "refusal_rate_per_kondisi": refusal_summary,
     }

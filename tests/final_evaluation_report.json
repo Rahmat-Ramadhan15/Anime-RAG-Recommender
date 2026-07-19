@@ -1,0 +1,110 @@
+{
+  "kualitas_jawaban_per_kondisi_kategori": {
+    "A": {
+      "similaritas_rekomendasi": {
+        "n_query": 35,
+        "mean_score": 2.9429
+      },
+      "filter_atribut": {
+        "n_query": 25,
+        "mean_score": 3.04
+      },
+      "faktual": {
+        "n_query": 17,
+        "mean_score": 3.2549
+      },
+      "multi_turn_refinement": {
+        "n_query": 12,
+        "mean_score": 2.8611
+      }
+    },
+    "B": {
+      "similaritas_rekomendasi": {
+        "n_query": 35,
+        "mean_score": 2.3143
+      },
+      "filter_atribut": {
+        "n_query": 25,
+        "mean_score": 3.0533
+      },
+      "faktual": {
+        "n_query": 17,
+        "mean_score": 3.0784
+      },
+      "multi_turn_refinement": {
+        "n_query": 12,
+        "mean_score": 2.4167
+      }
+    },
+    "C": {
+      "similaritas_rekomendasi": {
+        "n_query": 35,
+        "mean_score": 2.5143
+      },
+      "filter_atribut": {
+        "n_query": 25,
+        "mean_score": 2.84
+      },
+      "faktual": {
+        "n_query": 17,
+        "mean_score": 3.2353
+      },
+      "multi_turn_refinement": {
+        "n_query": 12,
+        "mean_score": 2.3611
+      }
+    }
+  },
+  "breakdown_per_kriteria_per_kondisi": {
+    "A": {
+      "relevansi": 3.2022,
+      "akurasi_faktual": 1.8876,
+      "koherensi": 3.9663
+    },
+    "B": {
+      "relevansi": 2.9101,
+      "akurasi_faktual": 1.5281,
+      "koherensi": 3.6067
+    },
+    "C": {
+      "relevansi": 2.9213,
+      "akurasi_faktual": 1.6517,
+      "koherensi": 3.5955
+    }
+  },
+  "uji_wilcoxon_signed_rank": {
+    "A_vs_B": {
+      "n_pairs": 89,
+      "mean_A": 3.0187,
+      "mean_B": 2.6816,
+      "wilcoxon_statistic": 972.5,
+      "p_value": 0.001168,
+      "signifikan_p<0.05": true
+    },
+    "B_vs_C": {
+      "n_pairs": 89,
+      "mean_B": 2.6816,
+      "mean_C": 2.7228,
+      "wilcoxon_statistic": 1039.0,
+      "p_value": 0.531607,
+      "signifikan_p<0.05": false
+    }
+  },
+  "refusal_rate_per_kondisi": {
+    "A": {
+      "n_query": 10,
+      "refusal_rate": 0.7,
+      "avg_ketepatan_penolakan": 4.3
+    },
+    "B": {
+      "n_query": 10,
+      "refusal_rate": 0.5,
+      "avg_ketepatan_penolakan": 2.8
+    },
+    "C": {
+      "n_query": 10,
+      "refusal_rate": 0.5,
+      "avg_ketepatan_penolakan": 3.0
+    }
+  }
+}
