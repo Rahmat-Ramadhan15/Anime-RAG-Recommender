@@ -144,11 +144,11 @@ class JikanClient:
             return f"https://www.youtube.com/watch?v={youtube_id}"
         return None
 
-    def enrich_batch(self, mal_ids: list[int], use_cache: bool = True) -> dict:
+    def enrich_batch(self, mal_ids: list[int], use_cache: bool = True, max_retries: int = 3) -> dict:
         """mal_ids -> {mal_id: {field enrichment}}"""
         result = {}
         for mal_id in mal_ids:
-            data = self.get_anime(mal_id, use_cache=use_cache)
+            data = self.get_anime(mal_id, use_cache=use_cache, max_retries=max_retries)
             result[mal_id] = self.extract_enrichment_fields(data)
         return result
 

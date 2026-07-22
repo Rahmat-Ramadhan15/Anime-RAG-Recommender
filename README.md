@@ -39,6 +39,8 @@ skripsi-anime-rag/
 │   ├── run_experiment.py       # Minggu 7 -- DONE (jalankan 99 query x 3 kondisi, butuh GPU/Kaggle)
 │   ├── llm_judge.py            # Minggu 7 -- DONE (LLM-as-a-Judge via Gemini, tidak butuh GPU)
 │   └── analyze_results.py      # Minggu 7 -- DONE (Wilcoxon signed-rank, refusal rate, tidak butuh GPU)
+├── app.py                      # Minggu 9 -- DONE (entry point Gradio untuk HF Spaces)
+├── requirements-space.txt      # dependency ramping khusus deployment (bukan requirements.txt penuh)
 ├── notebooks/
 │   ├── 02_build_index_kaggle.ipynb   # runner Kaggle GPU untuk build_index.py
 │   ├── 03_rag_pipeline_kaggle.ipynb  # runner Kaggle GPU untuk rag_pipeline.py
@@ -91,6 +93,7 @@ Unduh `anime_dataset.csv` dari Kaggle (link di atas) dan letakkan di `data/raw/a
 - [x] **Minggu 6** — Kondisi A (baseline SLM murni) **sudah otomatis tercakup** sejak Minggu 3, karena `generate()` dirancang satu fungsi untuk ketiga kondisi lewat flag `use_retrieval`/`use_enrichment` (bukan tiga implementasi terpisah). Tidak ada pekerjaan tambahan di sini -- lebih cepat dari jadwal.
 - [x] **Minggu 7** — Eksperimen penuh 99 query x 3 kondisi (`run_experiment.py`, GPU/Kaggle), LLM-as-a-Judge via Gemini (`llm_judge.py`, tidak butuh GPU), analisis Wilcoxon signed-rank + refusal rate (`analyze_results.py`, tidak butuh GPU)
 - [ ] **Minggu 8** — Snapshot Jikan API final, tinjau ulang `tests/final_evaluation_report.json` untuk bab hasil
+- [x] **Minggu 9 (sebagian)** — `app.py` (Gradio) siap: chat + poster (dari `image_url` dataset) + trailer (dari enrichment Jikan). Jalur model khusus CPU (`load_llm_gguf()`, GGUF via llama-cpp-python) ditambahkan karena `bitsandbytes` (dipakai di Kaggle) tidak kompatibel CPU. Belum di-deploy ke HF Spaces sungguhan -- perlu diuji lokal dulu.
 - [ ] **Minggu 7** — Evaluasi otomatis (Recall@k/MRR) + LLM-as-a-Judge
 - [ ] **Minggu 8** — Snapshot Jikan API, analisis statistik (Wilcoxon signed-rank)
 - [ ] **Minggu 9** — Human evaluation, UI Gradio, deployment HF Spaces
@@ -213,6 +216,49 @@ python src/analyze_results.py
 Menghasilkan `tests/final_evaluation_report.json`: skor kualitas per kondisi/kategori,
 uji Wilcoxon signed-rank berpasangan (A vs B, B vs C), dan refusal rate untuk kategori
 out-of-scope/adversarial. Ini yang dilampirkan ke bab hasil skripsi.
+
+## Menjalankan Minggu 9 (Deployment ke Hugging Face Spaces)
+
+**Perbedaan penting dari eksperimen Kaggle**: `app.py` memakai `load_llm_gguf()`
+(llama-cpp-python), BUKAN `load_llm()` (bitsandbytes) yang dipakai di Kaggle --
+bitsandbytes 4-bit HANYA jalan di GPU, sedangkan HF Spaces gratis defaultnya CPU-only.
+
+**Uji lokal dulu sebelum deploy:**
+
+```bash
+pip install -r requirements-space.txt
+python app.py
+```
+
+Buka `http://localhost:7860` di browser. Model GGUF (~2GB) akan diunduh otomatis
+sekali dari Hugging Face Hub saat pertama kali dijalankan (di-cache untuk run berikutnya).
+
+**Deploy ke HF Spaces:**
+
+1. Buat Space baru di huggingface.co/new-space, pilih SDK **Gradio**
+2. Upload seluruh isi repo ini (atau hubungkan lewat GitHub sync)
+3. Di Space, ganti/rename `requirements-space.txt` jadi `requirements.txt` khusus
+   di repo Space tsb (Space hanya membaca `requirements.txt`) -- atau cukup pastikan
+   file `requirements.txt` di repo Space isinya sama dengan `requirements-space.txt` di sini
+4. Pastikan `data/index/`, `data/processed/anime_documents.jsonl`, dan
+   `data/processed/anime_filtered.csv` (hasil Minggu 1-2) ikut ter-upload -- ini
+   dibutuhkan `app.py` saat startup
+5. Space akan otomatis menjalankan `app.py` sebagai entry point
+
+**Mode operasi**: `app.py` memakai gaya Kondisi B (retrieval, tanpa menunggu enrichment)
+untuk menghasilkan teks jawaban secara cepat, karena B vs C tidak berbeda signifikan
+secara kualitas jawaban (Minggu 7). Poster (dari `image_url` dataset) tampil instan.
+Trailer (dari Jikan API) diambil SETELAH jawaban ditampilkan lewat pola generator
+Gradio (respons progresif) -- supaya user tidak menunggu Jikan yang bisa lambat/gagal
+sebelum melihat jawaban. Fitur trailer tetap dipertahankan (sesuai revisi permintaan
+penguji di seminar proposal), hanya tidak lagi blocking di depan.
+
+**Inovasi tambahan -- explainability sederhana**: setiap poster diberi caption skor MAL
+(★) dan hingga 3 genre teratas, langsung dari metadata dataset (bukan Jikan, jadi tidak
+ada risiko latensi/kegagalan tambahan). Ini menjawab revisi penguji ("inovasi selain
+teks") dengan cara yang robust: menunjukkan sekilas _kenapa_ suatu anime direkomendasikan
+(skor + genre yang cocok), sekaligus memperkuat argumen bahwa jawaban chatbot benar-benar
+grounded pada data, bukan sekadar teks generatif.
 
 Lihat `docs/Dokumen_Rincian_Project_Skripsi.docx` untuk pembahasan lengkap alasan akademik di balik setiap keputusan.
 

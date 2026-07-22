@@ -1,0 +1,11 @@
+# Dependency khusus untuk deployment HF Spaces (app.py) -- lebih ramping
+# dari requirements.txt (yang juga mencakup tools riset: scipy, google-genai, dsb).
+
+gradio>=4.30
+sentence-transformers>=2.2
+faiss-cpu>=1.7
+llama-cpp-python>=0.2
+huggingface_hub>=0.23
+pandas>=2.0
+requests>=2.31
+pyyaml>=6.0
