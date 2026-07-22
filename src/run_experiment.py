@@ -1,11 +1,24 @@
 """
-Minggu 7 (Tahap 1): Menjalankan 99 query test set pada Kondisi A/B/C
+Minggu 7 (Tahap 1, versi 2 -- setelah penyempurnaan sistem): Menjalankan 99
+query test set pada Kondisi A/B/C
 
 Butuh GPU (Kaggle) karena memanggil LLM 99 x 3 = 297 kali. Kategori
 out_of_scope/adversarial_eksplisit TETAP dijalankan (bukan dilewati) --
 justru itu yang diukur: apakah sistem menolak dengan benar (refusal rate).
 
+CATATAN PERUBAHAN vs run pertama: sejak evaluasi Minggu 7 awal, sistem sudah
+disempurnakan (system prompt anti-halusinasi + format terstruktur, re-ranking
+skor MAL, exclusion anchor anime, konteks percakapan). Run ini memakai
+use_rerank=True dan pre_retrieved supaya evaluasi benar-benar mencerminkan
+perilaku app.py yang di-deploy, bukan versi lama.
+
+Kondisi C tetap disertakan (bukan dihapus) untuk mempertahankan struktur
+ablation study yang sama dengan run pertama -- lihat keputusan menghilangkan
+enrichment dari DEPLOYMENT (bukan dari metodologi evaluasi/riset) di README.
+
 Output: tests/experiment_results.jsonl (satu baris per query x kondisi)
+-- TIMPA hasil run pertama. Simpan salinan lama dulu kalau ingin membandingkan
+(mis. rename ke experiment_results_v1.jsonl sebelum menjalankan ini).
 """
 
 import json
@@ -48,8 +61,9 @@ def main():
             text = query_text(q)
             print(f"[{i}/{len(queries)}] {q['id']} ({q['category']})")
 
-            # Retrieval sekali per query (dipakai bareng Kondisi B & C untuk enrichment)
-            retrieved = pipe.retrieve(text, k=k)
+            # Retrieval sekali per query, SAMA PERSIS dengan yang dipakai app.py
+            # (use_rerank=True) -- dipakai bareng Kondisi B & C via pre_retrieved.
+            retrieved = pipe.retrieve(text, k=k, use_rerank=True)
             mal_ids = [d["mal_id"] for d in retrieved]
             enrichment_data = None
 
@@ -60,7 +74,7 @@ def main():
                         enrichment_data = pipe.enrich(mal_ids)
                     call_kwargs["enrichment_data"] = enrichment_data
 
-                result = pipe.generate(text, k=k, **call_kwargs)
+                result = pipe.generate(text, k=k, pre_retrieved=retrieved, **call_kwargs)
                 record = {
                     "query_id": q["id"],
                     "category": q["category"],

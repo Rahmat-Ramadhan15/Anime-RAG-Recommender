@@ -49,16 +49,22 @@ Batasan wajib:
   satupun anime di konteks yang benar-benar cocok, katakan dengan jujur bahwa
   Anda tidak menemukan kecocokan yang baik dari data yang tersedia -- JANGAN
   mengarang alternatif dari luar konteks.
+- CATATAN: kalau pengguna menyebut sebuah anime referensi (mis. "aku suka X, ada
+  yang mirip?"), anime X itu sendiri SENGAJA TIDAK ditampilkan di konteks di bawah
+  (karena tugas Anda mencari yang MIRIP dengan X, bukan mengulang X). Ini BUKAN
+  berarti tidak ada data yang relevan -- konteks di bawah tetap berisi kandidat
+  anime LAIN yang mirip dengan X, pilih rekomendasi dari situ seperti biasa.
 
 Format jawaban WAJIB seperti ini untuk SETIAP anime yang Anda rekomendasikan
 (salin judul PERSIS seperti tertulis di baris "Judul:" pada konteks):
 
 ### [Judul Persis Sesuai Konteks]
-(1-2 kalimat alasan kenapa direkomendasikan, dikaitkan dengan permintaan pengguna)
+Plot: (1 kalimat ringkasan singkat berdasarkan sinopsis di konteks, TANPA spoiler ending)
+Alasan: (1-2 kalimat alasan kenapa direkomendasikan, dikaitkan dengan permintaan pengguna)
 
 Ulangi blok ini untuk setiap anime yang direkomendasikan. Jangan pakai format lain
 (jangan pakai penomoran 1/2/3, jangan pakai bold **judul**) -- WAJIB pakai "### "
-di awal baris judul persis seperti contoh di atas.
+di awal baris judul, lalu baris "Plot:" dan "Alasan:" persis seperti contoh di atas.
 """
 
 PROMPT_TEMPLATE = PromptTemplate.from_template(
@@ -220,10 +226,30 @@ class RagPipeline:
         r"(?:suka|mirip dengan|mirip seperti|seperti|serupa dengan)\s+([^,\.\?!]+)",
         re.IGNORECASE,
     )
+    MIN_SCORE_PATTERN = re.compile(
+        r"(?:rating|skor|score)\s*(?:di\s*)?(?:atas|lebih dari|minimal|min\.?|>\s*=?)\s*(\d+(?:[.,]\d+)?)",
+        re.IGNORECASE,
+    )
 
     def _detect_genre_filter(self, query: str) -> list[str]:
         q = query.lower()
         return [g for g in self.GENRE_KEYWORDS if g in q]
+
+    def _detect_min_score(self, query: str) -> float | None:
+        """
+        Deteksi constraint rating minimum eksplisit di query (mis. "rating di atas 7",
+        "skor minimal 8"). Dipakai sebagai HARD FILTER (bukan cuma bobot re-ranking)
+        karena ini permintaan eksplisit user, bukan preferensi implisit -- melanggarnya
+        (mis. tetap merekomendasikan anime skor 6.27 saat diminta >7) adalah bug,
+        bukan sekadar kualitas rendah.
+        """
+        m = self.MIN_SCORE_PATTERN.search(query)
+        if not m:
+            return None
+        try:
+            return float(m.group(1).replace(",", "."))
+        except ValueError:
+            return None
 
     def _find_anchor_mal_id(self, query: str):
         """
@@ -268,6 +294,7 @@ class RagPipeline:
         """
         anchor_mal_id = self._find_anchor_mal_id(query)
         detected_genres = self._detect_genre_filter(query)
+        min_score = self._detect_min_score(query)
 
         if anchor_mal_id is not None and anchor_mal_id in self.doc_lookup:
             embed_input = self.doc_lookup[anchor_mal_id]
@@ -275,8 +302,8 @@ class RagPipeline:
             embed_input = query
 
         search_k = k + (1 if anchor_mal_id is not None else 0)
-        if detected_genres:
-            search_k = max(search_k, 50)  # ambil kandidat lebih banyak dulu, baru difilter genre
+        if detected_genres or min_score is not None:
+            search_k = max(search_k, 50)  # ambil kandidat lebih banyak dulu, baru difilter
         if use_rerank:
             search_k = max(search_k, 40)  # kandidat lebih banyak supaya re-ranking punya pilihan
 
@@ -295,6 +322,14 @@ class RagPipeline:
                 if not any(g in doc_genres for g in detected_genres):
                     continue
 
+            if min_score is not None:
+                doc_score = meta.get("score")
+                try:
+                    if doc_score is None or float(doc_score) != float(doc_score) or float(doc_score) < min_score:
+                        continue  # HARD FILTER: buang anime di bawah rating yang diminta eksplisit
+                except (TypeError, ValueError):
+                    continue
+
             results.append({
                 "mal_id": mal_id,
                 "score": float(score),
@@ -303,6 +338,7 @@ class RagPipeline:
                 "title_english": meta.get("title_english"),
                 "image_url": meta.get("image_url"),
                 "genres": meta.get("genres"),
+                "themes": meta.get("themes"),
                 "mal_score": meta.get("score"),
             })
             if not use_rerank and len(results) >= k:

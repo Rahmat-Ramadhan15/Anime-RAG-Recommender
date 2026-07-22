@@ -7,5 +7,7 @@ faiss-cpu>=1.7
 llama-cpp-python>=0.2
 huggingface_hub>=0.23
 pandas>=2.0
-requests>=2.31
 pyyaml>=6.0
+# Catatan: requests TIDAK diperlukan di sini -- app.py tidak lagi memakai Jikan
+# API/enrichment (lihat docstring app.py). requests tetap ada di requirements.txt
+# penuh karena masih dipakai src/enrichment.py untuk riset/ablation study Kondisi C.

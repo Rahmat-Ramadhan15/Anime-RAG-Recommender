@@ -88,7 +88,7 @@ Unduh `anime_dataset.csv` dari Kaggle (link di atas) dan letakkan di `data/raw/a
 - [x] **Minggu 1** — Preprocessing data: verifikasi `mal_id`, filtering rating Rx/Hentai, data hygiene (duplikat, status belum tayang + info minim), desain template chunking
 - [x] **Minggu 2** — Modul embedding + FAISS indexing (`build_index.py`) siap, portable CPU/GPU; notebook runner Kaggle tersedia
 - [x] **Minggu 3** — Modul `rag_pipeline.py` siap dan terverifikasi di Kaggle GPU: retrieval top-k, chat template resmi Llama-3.x (bukan prompt mentah), guardrail dasar di system prompt, mendukung Kondisi A/B/C langsung lewat satu fungsi `generate()`. Kondisi A terbukti berhalusinasi (contoh: kesalahan genre & karakter karangan) -- bukti kualitatif awal untuk argumen kebutuhan RAG.
-- [x] **Minggu 4** — Test set 99 query + ground truth lengkap, evaluasi Recall@k/Precision@k/MRR selesai. **k final = 5** (lihat `configs/config.yaml`). Temuan penting: retrieval semantik murni lemah pada constraint numerik (episode/rating) di query multi-turn -- dicatat sebagai keterbatasan arsitektural untuk bab pembahasan.
+- [x] **Minggu 4** — Test set 99 query + ground truth lengkap, evaluasi Recall@k/Precision@k/MRR selesai. **k final = 5** (lihat `configs/config.yaml`). Temuan penting: retrieval semantik murni lemah pada constraint numerik (episode/rating) di query multi-turn -- dicatat sebagai keterbatasan arsitektural untuk bab pembahasan. **Update pasca-deployment**: constraint rating minimum ("rating di atas X") kini ditegakkan sebagai hard filter di `retrieve()` (`_detect_min_score`), mengikuti pola yang sama dengan filter genre eksplisit -- mengatasi sebagian keterbatasan ini untuk kasus rating (episode/tahun belum, bisa jadi pengembangan lanjutan dengan pola serupa).
 - [x] **Minggu 5** — `enrichment.py`: Jikan API client dengan rate limit (~1 req/detik) dan cache snapshot JSON di `data/api_cache/` untuk reproducibility. `guardrails.py`: deteksi & tolak query eksplisit LANGSUNG sebelum panggil LLM (Lapisan 3), terintegrasi ke `rag_pipeline.py`. Poster tetap dari `image_url` dataset (bukan Jikan) sesuai keputusan sebelumnya.
 - [x] **Minggu 6** — Kondisi A (baseline SLM murni) **sudah otomatis tercakup** sejak Minggu 3, karena `generate()` dirancang satu fungsi untuk ketiga kondisi lewat flag `use_retrieval`/`use_enrichment` (bukan tiga implementasi terpisah). Tidak ada pekerjaan tambahan di sini -- lebih cepat dari jadwal.
 - [x] **Minggu 7** — Eksperimen penuh 99 query x 3 kondisi (`run_experiment.py`, GPU/Kaggle), LLM-as-a-Judge via Gemini (`llm_judge.py`, tidak butuh GPU), analisis Wilcoxon signed-rank + refusal rate (`analyze_results.py`, tidak butuh GPU)
@@ -245,20 +245,36 @@ sekali dari Hugging Face Hub saat pertama kali dijalankan (di-cache untuk run be
    dibutuhkan `app.py` saat startup
 5. Space akan otomatis menjalankan `app.py` sebagai entry point
 
-**Mode operasi**: `app.py` memakai gaya Kondisi B (retrieval, tanpa menunggu enrichment)
-untuk menghasilkan teks jawaban secara cepat, karena B vs C tidak berbeda signifikan
-secara kualitas jawaban (Minggu 7). Poster (dari `image_url` dataset) tampil instan.
-Trailer (dari Jikan API) diambil SETELAH jawaban ditampilkan lewat pola generator
-Gradio (respons progresif) -- supaya user tidak menunggu Jikan yang bisa lambat/gagal
-sebelum melihat jawaban. Fitur trailer tetap dipertahankan (sesuai revisi permintaan
-penguji di seminar proposal), hanya tidak lagi blocking di depan.
+**Keputusan arsitektur final (setelah evaluasi Minggu 7): TANPA enrichment di deployment.**
+`app.py` hanya memakai Kondisi B (RAG murni) + poster dari dataset lokal. Alasan,
+berbasis bukti (bukan sekadar penyederhanaan):
 
-**Inovasi tambahan -- explainability sederhana**: setiap poster diberi caption skor MAL
-(★) dan hingga 3 genre teratas, langsung dari metadata dataset (bukan Jikan, jadi tidak
-ada risiko latensi/kegagalan tambahan). Ini menjawab revisi penguji ("inovasi selain
-teks") dengan cara yang robust: menunjukkan sekilas _kenapa_ suatu anime direkomendasikan
-(skor + genre yang cocok), sekaligus memperkuat argumen bahwa jawaban chatbot benar-benar
-grounded pada data, bukan sekadar teks generatif.
+1. Uji Wilcoxon Minggu 7 menunjukkan **B vs C tidak berbeda signifikan** (p=0.53)
+   secara kualitas jawaban -- enrichment tidak terbukti menambah kualitas terukur.
+2. Jikan API (unofficial, tanpa SLA) sering timeout, menambah ketidakandalan tanpa
+   manfaat kualitas yang terbukti.
+3. Poster dari `image_url` dataset (zero risiko API eksternal) sudah cukup memenuhi
+   revisi penguji ("inovasi selain teks").
+
+Kondisi C, `src/enrichment.py`, dan hasil evaluasinya (Minggu 7) **tetap dipertahankan**
+di repo -- ini bagian sah dari ablation study yang mendasari keputusan di atas, bukan
+kode yang dibuang. Ceritakan di skripsi sebagai: "kami mengimplementasikan dan
+mengevaluasi enrichment, menemukan tidak ada peningkatan signifikan, sehingga sistem
+final disederhanakan untuk keandalan maksimal."
+
+**Inovasi yang dipertahankan di deployment -- explainability sederhana**: setiap poster
+diberi caption skor MAL (★) dan hingga 3 genre teratas, langsung dari metadata dataset.
+Jawaban juga menyertakan bagian "Plot" (ringkasan singkat non-spoiler) dan "Alasan"
+(kenapa direkomendasikan) per anime, format terstruktur `### Judul` yang dipecah dan
+disisipi poster tepat di bawahnya -- teks dan gambar menyatu di pesan yang sama.
+
+**Catatan revisi prompt pasca-evaluasi**: `SYSTEM_PROMPT` telah disempurnakan beberapa
+kali selama tahap deployment/pengujian kualitatif (larangan tegas rekomendasi di luar
+konteks, klarifikasi soal anchor exclusion, format terstruktur). Ini membuat
+`tests/final_evaluation_report.json` yang ada saat ini merepresentasikan versi SEBELUM
+penyempurnaan tsb -- rencana selanjutnya adalah menjalankan ulang Minggu 7 (evaluasi
+otomatis + LLM-as-a-Judge) dengan sistem yang sudah disempurnakan untuk mendapat angka
+yang mencerminkan sistem final.
 
 Lihat `docs/Dokumen_Rincian_Project_Skripsi.docx` untuk pembahasan lengkap alasan akademik di balik setiap keputusan.
 
