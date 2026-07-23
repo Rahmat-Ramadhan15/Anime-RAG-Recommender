@@ -1,0 +1,77 @@
+{
+  "kualitas_jawaban_per_kondisi_kategori": {
+    "A": {
+      "similaritas_rekomendasi": {
+        "n_query": 35,
+        "mean_score": 2.3333
+      },
+      "filter_atribut": {
+        "n_query": 25,
+        "mean_score": 2.6
+      },
+      "faktual": {
+        "n_query": 17,
+        "mean_score": 2.4118
+      },
+      "multi_turn_refinement": {
+        "n_query": 12,
+        "mean_score": 3.0
+      }
+    },
+    "B": {
+      "similaritas_rekomendasi": {
+        "n_query": 35,
+        "mean_score": 2.8667
+      },
+      "filter_atribut": {
+        "n_query": 25,
+        "mean_score": 3.32
+      },
+      "faktual": {
+        "n_query": 17,
+        "mean_score": 3.2941
+      },
+      "multi_turn_refinement": {
+        "n_query": 12,
+        "mean_score": 2.4167
+      }
+    }
+  },
+  "breakdown_per_kriteria_per_kondisi": {
+    "A": {
+      "relevansi": 2.3596,
+      "akurasi_faktual": 1.3483,
+      "koherensi": 3.8315
+    },
+    "B": {
+      "relevansi": 3.191,
+      "akurasi_faktual": 1.9663,
+      "koherensi": 3.8876
+    }
+  },
+  "uji_wilcoxon_signed_rank": {
+    "A_vs_B": {
+      "n_pairs": 89,
+      "mean_A": 2.5131,
+      "mean_B": 3.015,
+      "wilcoxon_statistic": 1136.0,
+      "p_value": 0.001549,
+      "signifikan_p<0.05": true
+    },
+    "B_vs_C": {
+      "error": "data tidak cukup untuk uji statistik"
+    }
+  },
+  "refusal_rate_per_kondisi": {
+    "A": {
+      "n_query": 10,
+      "refusal_rate": 0.7,
+      "avg_ketepatan_penolakan": 3.3
+    },
+    "B": {
+      "n_query": 10,
+      "refusal_rate": 0.5,
+      "avg_ketepatan_penolakan": 3.7
+    }
+  }
+}
