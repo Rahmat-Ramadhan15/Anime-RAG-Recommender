@@ -1,20 +1,25 @@
+%%writefile src/run_experiment.py
 """
 Minggu 7 (Tahap 1, versi 2 -- setelah penyempurnaan sistem): Menjalankan 99
-query test set pada Kondisi A/B/C
+query test set pada Kondisi A/B
 
-Butuh GPU (Kaggle) karena memanggil LLM 99 x 3 = 297 kali. Kategori
+Butuh GPU (Kaggle) karena memanggil LLM 99 x 2 = 198 kali. Kategori
 out_of_scope/adversarial_eksplisit TETAP dijalankan (bukan dilewati) --
 justru itu yang diukur: apakah sistem menolak dengan benar (refusal rate).
 
-CATATAN PERUBAHAN vs run pertama: sejak evaluasi Minggu 7 awal, sistem sudah
-disempurnakan (system prompt anti-halusinasi + format terstruktur, re-ranking
-skor MAL, exclusion anchor anime, konteks percakapan). Run ini memakai
-use_rerank=True dan pre_retrieved supaya evaluasi benar-benar mencerminkan
-perilaku app.py yang di-deploy, bukan versi lama.
-
-Kondisi C tetap disertakan (bukan dihapus) untuk mempertahankan struktur
-ablation study yang sama dengan run pertama -- lihat keputusan menghilangkan
-enrichment dari DEPLOYMENT (bukan dari metodologi evaluasi/riset) di README.
+CATATAN PERUBAHAN vs run pertama:
+1. Sejak evaluasi Minggu 7 awal, sistem sudah disempurnakan (system prompt
+   anti-halusinasi + format terstruktur, re-ranking skor MAL, hard filter
+   rating minimum, exclusion anchor anime, konteks percakapan). Run ini
+   memakai use_rerank=True dan pre_retrieved supaya evaluasi benar-benar
+   mencerminkan perilaku app.py yang di-deploy.
+2. Kondisi C DIHAPUS dari re-run ini -- TIDAK lagi dipakai di deployment
+   (lihat README, keputusan menghilangkan enrichment), dan perbandingan
+   B vs C sudah tersedia dari run v1 (tests/experiment_results_v1.jsonl,
+   final_evaluation_report_v1.json: p=0.53, tidak berbeda signifikan).
+   Mengulang C hanya menambah risiko kegagalan Jikan API tanpa nilai baru.
+   Kalau butuh angka Kondisi C untuk bab hasil, rujuk hasil v1 -- tidak
+   perlu dijalankan ulang.
 
 Output: tests/experiment_results.jsonl (satu baris per query x kondisi)
 -- TIMPA hasil run pertama. Simpan salinan lama dulu kalau ingin membandingkan
@@ -32,7 +37,6 @@ OUT_PATH = Path("tests/experiment_results.jsonl")
 CONDITIONS = [
     ("A", {"use_retrieval": False, "use_enrichment": False}),
     ("B", {"use_retrieval": True, "use_enrichment": False}),
-    ("C", {"use_retrieval": True, "use_enrichment": True}),
 ]
 
 
@@ -54,6 +58,7 @@ def main():
     k = pipe.cfg["retrieval"]["top_k_final"]
     total_calls = len(queries) * len(CONDITIONS)
     print(f"[INFO] {len(queries)} query x {len(CONDITIONS)} kondisi = {total_calls} pemanggilan generate()")
+    print("[INFO] Kondisi C TIDAK disertakan -- lihat catatan di docstring file ini.")
 
     n_written = 0
     with open(OUT_PATH, "w", encoding="utf-8") as f:
@@ -62,19 +67,11 @@ def main():
             print(f"[{i}/{len(queries)}] {q['id']} ({q['category']})")
 
             # Retrieval sekali per query, SAMA PERSIS dengan yang dipakai app.py
-            # (use_rerank=True) -- dipakai bareng Kondisi B & C via pre_retrieved.
+            # (use_rerank=True) -- dipakai bareng Kondisi B via pre_retrieved.
             retrieved = pipe.retrieve(text, k=k, use_rerank=True)
-            mal_ids = [d["mal_id"] for d in retrieved]
-            enrichment_data = None
 
             for cond_name, kwargs in CONDITIONS:
-                call_kwargs = dict(kwargs)
-                if cond_name == "C" and mal_ids:
-                    if enrichment_data is None:
-                        enrichment_data = pipe.enrich(mal_ids)
-                    call_kwargs["enrichment_data"] = enrichment_data
-
-                result = pipe.generate(text, k=k, pre_retrieved=retrieved, **call_kwargs)
+                result = pipe.generate(text, k=k, pre_retrieved=retrieved, **kwargs)
                 record = {
                     "query_id": q["id"],
                     "category": q["category"],
