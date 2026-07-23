@@ -1,4 +1,3 @@
-%%writefile src/run_experiment.py
 """
 Minggu 7 (Tahap 1, versi 2 -- setelah penyempurnaan sistem): Menjalankan 99
 query test set pada Kondisi A/B
